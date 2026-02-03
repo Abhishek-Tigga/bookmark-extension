@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Bookmark Manager</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0c0d10;
+        color: #c9ced8;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 32px 24px 64px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 20px;
+        font-weight: 600;
+        color: #e6e9ef;
+      }
+
+      #status {
+        margin: 0 0 16px;
+        color: #8b93a1;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+
+      .row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .folder-row {
+        font-weight: 600;
+        color: #d7dbe4;
+      }
+
+      .bookmark-row {
+        font-weight: 500;
+        color: #c1c7d2;
+      }
+
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        color: #8b93a1;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .delete-btn {
+        margin-left: auto;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #7a818f;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .delete-btn:hover {
+        color: #f06a6a;
+        border-color: rgba(240, 106, 106, 0.4);
+        background: rgba(240, 106, 106, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Bookmark Manager</h1>
+
+      <p id="status">Loading bookmarks...</p>
+
+      <div id="bookmarkContainer"></div>
+    </div>
+
+    <script src="manager.js"></script>
+  </body>
+</html>
