@@ -1,7 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
   const statusEl = document.getElementById("status");
   const container = document.getElementById("bookmarkContainer");
+  const searchInput = document.getElementById("searchInput");
   if (!statusEl || !container) return;
+
+  let treeCache = null;
 
   const loadAndRender = () => {
     chrome.bookmarks.getTree((tree) => {
@@ -11,15 +14,39 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      statusEl.textContent = "";
-      container.textContent = "";
-
-      const root = tree[0].children;
-      root.forEach((node) => {
-        renderNode(node, container, 0, loadAndRender, statusEl);
-      });
+      treeCache = tree;
+      renderForQuery();
     });
   };
+
+  const renderForQuery = () => {
+    if (!treeCache) return;
+    const query = (searchInput?.value || "").trim().toLowerCase();
+
+    statusEl.textContent = "";
+    container.textContent = "";
+
+    const root = treeCache[0].children;
+    if (!query) {
+      root.forEach((node) => {
+        renderNode(node, container, 0, loadAndRender, statusEl, false);
+      });
+      return;
+    }
+
+    const filtered = filterTree(root, query);
+    if (!filtered.length) {
+      statusEl.textContent = "No matches.";
+      return;
+    }
+    filtered.forEach((node) => {
+      renderNode(node, container, 0, loadAndRender, statusEl, true);
+    });
+  };
+
+  if (searchInput) {
+    searchInput.addEventListener("input", renderForQuery);
+  }
 
   loadAndRender();
 });
@@ -36,7 +63,36 @@ function collapseAll(containerEl) {
   });
 }
 
-function renderNode(node, parentEl, depth, reload, statusEl) {
+function normalize(value) {
+  return (value || "").toLowerCase();
+}
+
+function matchesBookmark(node, pathNames, query) {
+  const fields = [node.title, node.url, ...pathNames];
+  // Hook: include bookmark description here later.
+  return fields.some((value) => normalize(value).includes(query));
+}
+
+function filterTree(nodes, query, pathNames = []) {
+  const results = [];
+  (nodes || []).forEach((node) => {
+    if (node.url) {
+      if (matchesBookmark(node, pathNames, query)) {
+        results.push({ ...node });
+      }
+      return;
+    }
+
+    const nextPath = [...pathNames, node.title || ""];
+    const children = filterTree(node.children || [], query, nextPath);
+    if (children.length) {
+      results.push({ ...node, children });
+    }
+  });
+  return results;
+}
+
+function renderNode(node, parentEl, depth, reload, statusEl, forceExpand) {
   if (node.url) {
     // Bookmark
     const link = document.createElement("a");
@@ -84,7 +140,8 @@ function renderNode(node, parentEl, depth, reload, statusEl) {
 
     title.className = "row folder-row";
     indicator.className = "folder-indicator";
-    indicator.textContent = depth === 0 ? "▼" : "▶";
+    const shouldExpandDefault = forceExpand ? true : depth === 0;
+    indicator.textContent = shouldExpandDefault ? "▼" : "▶";
     name.textContent = node.title || "Untitled folder";
 
     const icon = document.createElement("span");
@@ -105,13 +162,14 @@ function renderNode(node, parentEl, depth, reload, statusEl) {
       const children = document.createElement("div");
       children.className = "folder-children";
       children.style.marginLeft = "16px";
-      children.dataset.expanded = depth === 0 ? "true" : "false";
-      if (depth !== 0) {
+      const shouldExpand = shouldExpandDefault;
+      children.dataset.expanded = shouldExpand ? "true" : "false";
+      if (!shouldExpand) {
         children.style.display = "none";
       }
 
       node.children.forEach((child) =>
-        renderNode(child, children, depth + 1, reload, statusEl)
+        renderNode(child, children, depth + 1, reload, statusEl, forceExpand)
       );
       folder.appendChild(children);
 
