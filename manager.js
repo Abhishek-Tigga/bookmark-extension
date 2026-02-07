@@ -27,9 +27,19 @@ document.addEventListener("DOMContentLoaded", () => {
     container.textContent = "";
 
     const root = treeCache[0].children;
+    const duplicateCounts = buildDuplicateCounts(root);
     if (!query) {
       root.forEach((node) => {
-        renderNode(node, container, 0, loadAndRender, statusEl, false, "");
+        renderNode(
+          node,
+          container,
+          0,
+          loadAndRender,
+          statusEl,
+          false,
+          "",
+          duplicateCounts
+        );
       });
       return;
     }
@@ -43,7 +53,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     filtered.forEach((node) => {
-      renderNode(node, container, 0, loadAndRender, statusEl, true, query);
+      renderNode(
+        node,
+        container,
+        0,
+        loadAndRender,
+        statusEl,
+        true,
+        query,
+        duplicateCounts
+      );
     });
   };
 
@@ -95,6 +114,55 @@ function filterTree(nodes, query, pathNames = []) {
   return results;
 }
 
+function normalizeUrl(rawUrl) {
+  if (!rawUrl) return "";
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_error) {
+    try {
+      parsed = new URL(`https://${rawUrl}`);
+    } catch (__error) {
+      return rawUrl.trim().toLowerCase().replace(/\/+$/, "");
+    }
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  const pathname = parsed.pathname.replace(/\/+$/, "");
+  const filteredParams = new URLSearchParams();
+  parsed.searchParams.forEach((value, key) => {
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey.startsWith("utm_") ||
+      lowerKey === "gclid" ||
+      lowerKey === "fbclid"
+    ) {
+      return;
+    }
+    filteredParams.append(key, value);
+  });
+
+  const query = filteredParams.toString();
+  const basePath = pathname || "";
+  const hash = parsed.hash || "";
+  return `${host}${basePath}${query ? `?${query}` : ""}${hash}`;
+}
+
+function buildDuplicateCounts(nodes, counts = new Map()) {
+  (nodes || []).forEach((node) => {
+    if (node.url) {
+      const key = normalizeUrl(node.url);
+      if (key) {
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      return;
+    }
+    buildDuplicateCounts(node.children || [], counts);
+  });
+  return counts;
+}
+
 function appendHighlightedText(parentEl, text, query) {
   const value = text || "";
   if (!query) {
@@ -127,7 +195,16 @@ function appendHighlightedText(parentEl, text, query) {
   }
 }
 
-function renderNode(node, parentEl, depth, reload, statusEl, forceExpand, query) {
+function renderNode(
+  node,
+  parentEl,
+  depth,
+  reload,
+  statusEl,
+  forceExpand,
+  query,
+  duplicateCounts
+) {
   if (node.url) {
     // Bookmark
     const link = document.createElement("a");
@@ -145,6 +222,14 @@ function renderNode(node, parentEl, depth, reload, statusEl, forceExpand, query)
       '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 1 0-7l2-2a5 5 0 0 1 7 7l-2 2"/><path d="M14 11a5 5 0 0 1 0 7l-2 2a5 5 0 0 1-7-7l2-2"/></svg>';
     item.appendChild(icon);
     item.appendChild(link);
+
+    const duplicateCount = duplicateCounts.get(normalizeUrl(node.url)) || 0;
+    if (duplicateCount > 1) {
+      const badge = document.createElement("span");
+      badge.className = "duplicate-badge";
+      badge.textContent = "Duplicate";
+      item.appendChild(badge);
+    }
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
@@ -204,7 +289,16 @@ function renderNode(node, parentEl, depth, reload, statusEl, forceExpand, query)
       }
 
       node.children.forEach((child) =>
-        renderNode(child, children, depth + 1, reload, statusEl, forceExpand, query)
+        renderNode(
+          child,
+          children,
+          depth + 1,
+          reload,
+          statusEl,
+          forceExpand,
+          query,
+          duplicateCounts
+        )
       );
       folder.appendChild(children);
 
