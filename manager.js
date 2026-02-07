@@ -29,18 +29,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const root = treeCache[0].children;
     if (!query) {
       root.forEach((node) => {
-        renderNode(node, container, 0, loadAndRender, statusEl, false);
+        renderNode(node, container, 0, loadAndRender, statusEl, false, "");
       });
       return;
     }
 
     const filtered = filterTree(root, query);
     if (!filtered.length) {
-      statusEl.textContent = "No matches.";
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No results found. Try a different keyword.";
+      container.appendChild(empty);
       return;
     }
     filtered.forEach((node) => {
-      renderNode(node, container, 0, loadAndRender, statusEl, true);
+      renderNode(node, container, 0, loadAndRender, statusEl, true, query);
     });
   };
 
@@ -92,14 +95,46 @@ function filterTree(nodes, query, pathNames = []) {
   return results;
 }
 
-function renderNode(node, parentEl, depth, reload, statusEl, forceExpand) {
+function appendHighlightedText(parentEl, text, query) {
+  const value = text || "";
+  if (!query) {
+    parentEl.textContent = value;
+    return;
+  }
+
+  const lower = value.toLowerCase();
+  let start = 0;
+  let index = lower.indexOf(query);
+  if (index === -1) {
+    parentEl.textContent = value;
+    return;
+  }
+
+  while (index !== -1) {
+    if (index > start) {
+      parentEl.appendChild(document.createTextNode(value.slice(start, index)));
+    }
+    const mark = document.createElement("mark");
+    mark.className = "highlight";
+    mark.textContent = value.slice(index, index + query.length);
+    parentEl.appendChild(mark);
+    start = index + query.length;
+    index = lower.indexOf(query, start);
+  }
+
+  if (start < value.length) {
+    parentEl.appendChild(document.createTextNode(value.slice(start)));
+  }
+}
+
+function renderNode(node, parentEl, depth, reload, statusEl, forceExpand, query) {
   if (node.url) {
     // Bookmark
     const link = document.createElement("a");
     link.href = node.url;
-    link.textContent = node.title || node.url;
     link.target = "_blank";
     link.rel = "noreferrer";
+    appendHighlightedText(link, node.title || node.url, query);
 
     const item = document.createElement("div");
     item.className = "row bookmark-row";
@@ -142,7 +177,7 @@ function renderNode(node, parentEl, depth, reload, statusEl, forceExpand) {
     indicator.className = "folder-indicator";
     const shouldExpandDefault = forceExpand ? true : depth === 0;
     indicator.textContent = shouldExpandDefault ? "▼" : "▶";
-    name.textContent = node.title || "Untitled folder";
+    appendHighlightedText(name, node.title || "Untitled folder", query);
 
     const icon = document.createElement("span");
     icon.className = "icon";
@@ -169,7 +204,7 @@ function renderNode(node, parentEl, depth, reload, statusEl, forceExpand) {
       }
 
       node.children.forEach((child) =>
-        renderNode(child, children, depth + 1, reload, statusEl, forceExpand)
+        renderNode(child, children, depth + 1, reload, statusEl, forceExpand, query)
       );
       folder.appendChild(children);
 
